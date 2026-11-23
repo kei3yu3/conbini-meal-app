@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useMealSuggest } from '../hooks/useMealSuggest';
 import type { MealCombination } from '../hooks/useMealSuggest';
@@ -28,6 +29,21 @@ export default function Result() {
   // localStorageにお気に入りセットを永続化するためのフック
   const [favorites, setFavorites] = useLocalStorage<MealCombination[]>('cvs-favorites', []);
 
+  // 店内でカゴに入れた商品のID一覧を管理するState
+  const [checkedIds, setCheckedIds] = useState<string[]>([]);
+
+  // 別の提案に切り替わったタイミングでチェック状態をリセットする処理
+  useEffect(() => {
+    setCheckedIds([]);
+  }, [currentSuggestion]);
+
+  // 指定した商品IDのチェック状態をオン・オフ切り替えるハンドラ
+  const handleToggleCheck = (id: string) => {
+    setCheckedIds((prev) =>
+      prev.includes(id) ? prev.filter((itemId) => itemId !== id) : [...prev, id]
+    );
+  };
+
   // 現在の提案をお気に入りの先頭に追加してお気に入り画面へ遷移する処理
   const handleSave = () => {
     if (currentSuggestion) {
@@ -45,6 +61,11 @@ export default function Result() {
       </div>
     );
   }
+
+  // 全商品のうち何品カゴに入れたかを集計する値
+  const totalCount = currentSuggestion.items.length;
+  const checkedCount = checkedIds.length;
+  const isAllChecked = totalCount > 0 && checkedCount === totalCount;
 
   return (
     // 下部アクションバーとFloatingNav分の余白（160px）を確保するレイアウト
@@ -64,17 +85,40 @@ export default function Result() {
         </span>
       </header>
 
-      {/* 栄養サマリーと提案された商品カード一覧を表示するメイン領域 */}
+      {/* 栄養サマリーとチェック可能な商品カード一覧を表示するメイン領域 */}
       <main className="p-4 max-w-md mx-auto space-y-6">
         <MacroSummary suggestion={currentSuggestion} />
 
         <div className="space-y-4">
-          <h2 className="text-sm font-bold text-gray-700 ml-2">商品の組み合わせ</h2>
+          {/* 見出しと店内カゴ入れ進捗カウンターのヘッダー行 */}
+          <div className="flex items-center justify-between px-2">
+            <h2 className="text-sm font-bold text-gray-700">商品の組み合わせ</h2>
+            <span
+              className={`text-xs font-medium px-2 py-1 rounded ${
+                isAllChecked
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-200 text-gray-600'
+              }`}
+            >
+              {isAllChecked ? 'すべてカゴに入れました' : `カゴに入れた ${checkedCount} / ${totalCount}`}
+            </span>
+          </div>
+
+          {/* タップでチェックできる商品カードリスト */}
           <div className="flex flex-col gap-2">
-            {currentSuggestion.items.map(item => (
-              <ProductCard key={item.id} product={item} />
+            {currentSuggestion.items.map((item) => (
+              <ProductCard
+                key={item.id}
+                product={item}
+                isChecked={checkedIds.includes(item.id)}
+                onToggle={() => handleToggleCheck(item.id)}
+              />
             ))}
           </div>
+
+          <p className="text-xs text-gray-400 text-center pt-2">
+            商品カードをタップするとカゴに入れたチェックが付きます
+          </p>
         </div>
       </main>
 
